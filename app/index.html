@@ -1,0 +1,109 @@
+<?php
+require_once('../../../config.php');
+require_once('../datalib.php');
+
+require_login();
+$context = get_context_instance(CONTEXT_SYSTEM);
+$PAGE->set_context($context);
+require_capability('moodle/question:viewall', $context);
+
+add_to_log(SITEID, 'local_iteminspector', 'view', "index.php");
+
+$striteminspector = get_string('pluginname', 'local_iteminspector');
+
+$renderer = $PAGE->get_renderer('local_iteminspector');
+$iteminspector_data = new iteminspector_data();
+
+
+// Check for CSV download option
+if (optional_param('download', false, PARAM_INT) && ($table = $renderer->render_items_list($iteminspector_data))) {
+	$date = date('Y-m-d');
+	header('Content-Description: File Transfer');
+	header("Content-Type: application/csv") ;
+	header("Content-Disposition: attachment; filename=items_{$date}.csv");
+	header("Pragma: no-cache");
+	header("Expires: 0");
+	echo $renderer->render_csv($table);
+	exit;
+}
+
+$PAGE->set_pagelayout('report');
+$PAGE->set_url('/local/iteminspector/app/index.php');
+$PAGE->set_title($striteminspector);
+$PAGE->set_heading($striteminspector);
+$PAGE->requires->js("/local/iteminspector/app/lib/angular/angular.js", true);
+$PAGE->requires->js("/local/iteminspector/app/js/app.js", true);
+$PAGE->requires->css("/local/iteminspector/app/css/app.css");
+
+$dwnld = new moodle_url('/local/iteminspector/app/index.php?download=1');
+
+echo $OUTPUT->header();
+echo $OUTPUT->heading($striteminspector);
+
+?>
+
+<div id="iteminspector" ng-app="itemInspector">
+<div ng-controller="ItemListCtrl">
+<div class="iteminspector_options">
+	<div class="iteminspector_filter">	
+		<label for="table-filter">Search:</label><input type='text' name='table-filter' ng-model="tableParams.filter" placeholder='Search'>
+	</div>
+	<div class="iteminspector_csv">
+		<a class="btn " href='<?php echo $dwnld; ?>'>Download CSV</a>
+	</div>
+</div>
+<div class="alert alert-error" ng-show="errors.length > 0">
+	{{errors}}
+</div>
+
+<table class="generaltable">
+	<thead>
+		<tr>
+			<th ng-repeat="key in headOrder" class="row_{{key}}"><a ng-click="changeSort(key)" ng-class="selectedCls(key)">{{head[key]}}</a></th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr ng-repeat="item in items">
+			<td>
+				<a ng-href="{{item.url}}" target="_blank">{{item.name}}</a>
+			</td>
+			<td>{{item.difficulty}}</td>
+			<td>{{item.scaled_difficulty}}</td>
+			<td>
+				<div ng-hide="item.tagEditEnabled">
+					<span>{{item.tags}}</span>
+					<button type="button" class="btn iteminspector_edit_tag" ng-click="enableEditTag(item)" ng-hide="item.disableEditButton">Edit</button>
+					<div class="tag_sub_status" ng-show="item.disableEditButton">
+						<div class="alert alert-success" ng-show="item.show_success">Updated successfully<span ng-click="closeAlerts(item)">x</span></div>
+						<div class="alert alert-error" ng-show="item.show_errors">Invalid tags: {{item.errors}}<span ng-click="closeAlerts(item)">x</span></div>
+					</div>
+				</div>
+				<div ng-show="item.tagEditEnabled" class="iteminspector_tags_edit">
+					<input type='text' ng-model="item.editableTags">
+					<div class="iteminspector_edit_tag">
+						<button type="button" class="btn btn-success" ng-click="editTag(item)" ng-hide="item.show_buttons">Save</button>
+						<button type="button" class="btn btn-danger" ng-click="cancelEditTag(item)" ng-hide="item.show_buttons">Cancel</button>
+						<img ng-src="img/loading_small.gif" ng-show="item.submiting == true" />
+						
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>
+<div class="pagination" ng-class="{'hidden': tableParams.pagination_enabled == false}" >
+  <ul>
+    <li ng-class="{'disabled': tableParams.page == 1}"><a ng-click="changePage(tableParams.page - 1)">Prev</a></li>
+    <li ng-class="{'disabled': tableParams.paging_page == 1}"><a ng-click="shiftPaging(tableParams.paging_page - 1)">..</a></li>
+    <li ng-repeat="page in pages" ng-class="{'active': tableParams.page == page}"><a ng-click="changePage(page)">{{page}}</a></li>
+    <li ng-class="{'disabled': tableParams.paging_page == paging_button_limit}"><a ng-click="shiftPaging(tableParams.paging_page + 1)">..</a></li>
+    <li ng-class="{'disabled': tableParams.page == paging_limit}"><a ng-click="changePage(tableParams.page + 1)">Next</a></li>
+  </ul>
+</div>
+</div>
+</div>
+ <?php
+echo $OUTPUT->footer();
+
+?>
+
